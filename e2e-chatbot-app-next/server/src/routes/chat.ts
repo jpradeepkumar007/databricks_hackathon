@@ -69,6 +69,7 @@ const streamCache = new StreamCache();
 // Apply auth middleware to all chat routes
 chatRouter.use(authMiddleware);
 
+
 /**
  * POST /api/chat - Send a message and get streaming response
  *
@@ -269,6 +270,21 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
       onChunk: ({ chunk }) => {
         if (chunk.type === 'raw') {
           const raw = chunk.rawValue as any;
+          try {
+            // Always log raw backend response without any filtering/transform
+            if (typeof raw === 'string') {
+              console.log('[Chat][RAW CHUNK]', raw);
+            } else {
+              try {
+                console.log('[Chat][RAW CHUNK]', JSON.stringify(raw));
+              } catch {
+                console.log('[Chat][RAW CHUNK] (raw object)', raw);
+              }
+            }
+          } catch (e) {
+            // Ensure logging never throws
+            console.log('[Chat][RAW CHUNK] (logging failed)');
+          }
           // Extract trace in Databricks serving endpoint output format, if present
           if (raw?.type === 'response.output_item.done') {
             const traceIdFromChunk =

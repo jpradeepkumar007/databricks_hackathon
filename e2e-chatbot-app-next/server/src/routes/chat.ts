@@ -287,23 +287,28 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
           try {
             if (raw?.type === 'item' && raw?.item?.type === 'image') {
               const item = raw.item;
-              imageChunks.push({ mime: item.mime, data_base64: item.data_base64 });
               console.log('[Chat] Captured image chunk (base64 length):', String(item.data_base64 ?? '').length);
 
               // If the UI writer is active, forward immediately so the client
-              // can render the image during streaming.
+              // can render the image during streaming. Only store the chunk for
+              // later injection when we couldn't forward immediately (either
+              // because the writer wasn't attached yet or because forwarding
+              // threw an error). This avoids duplicate images (one immediate
+              // forward + one later injection).
               if (uiWriter) {
                 try {
                   const mime = item.mime ?? 'image/png';
                   const data = item.data_base64;
                   console.log('[Chat] Forwarding captured image to UI writer immediately', { mime, length: String(data).length });
-                  // Emit as a file part so the client receives a proper file/image
-                  // chunk (mediaType + data URL) which maps to message.parts of
-                  // type 'file' and renders via PreviewAttachment.
                   uiWriter.write({ type: 'file', mediaType: mime, url: `data:${mime};base64,${data}` });
                 } catch (fwErr) {
                   console.warn('[Chat] Failed to forward captured image immediately', fwErr);
+                  // Save for later injection if immediate forward failed
+                  imageChunks.push({ mime: item.mime, data_base64: item.data_base64 });
                 }
+              } else {
+                // UI writer not attached yet — store for later injection
+                imageChunks.push({ mime: item.mime, data_base64: item.data_base64 });
               }
             }
           } catch (e) {

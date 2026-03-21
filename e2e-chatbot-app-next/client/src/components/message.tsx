@@ -172,25 +172,7 @@ const PurePreviewMessage = ({
               message.role === 'user' && mode !== 'edit',
           })}
         >
-          {attachmentsFromMessage.length > 0 && (
-            <div
-              data-testid={`message-attachments`}
-              className={cn('flex flex-row justify-end gap-2', {
-                'justify-start': message.role === 'assistant',
-              })}
-            >
-              {attachmentsFromMessage.map((attachment) => (
-                <PreviewAttachment
-                  key={attachment.url}
-                  attachment={{
-                    name: attachment.filename ?? 'file',
-                    contentType: attachment.mediaType,
-                    url: attachment.url,
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          {/* Attachment rendering moved below text so images appear after text output */}
 
           {partSegments?.map((parts, index) => {
             const [part] = parts;
@@ -255,6 +237,32 @@ const PurePreviewMessage = ({
                       <Response>
                         {sanitizeText(textWithoutImgs)}
                       </Response>
+
+                      {/* Render file/attachment parts after the text so images appear after output */}
+                      {attachmentsFromMessage.length > 0 && (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          {attachmentsFromMessage.map((attachment, i) =>
+                            attachment.mediaType?.startsWith('image') ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                key={`attach-img-${key}-${i}`}
+                                src={attachment.url}
+                                alt={attachment.filename ?? `attachment-${i}`}
+                                className="w-full rounded-md border bg-muted"
+                              />
+                            ) : (
+                              <PreviewAttachment
+                                key={`attach-file-${key}-${i}`}
+                                attachment={{
+                                  name: attachment.filename ?? 'file',
+                                  contentType: attachment.mediaType,
+                                  url: attachment.url,
+                                }}
+                              />
+                            ),
+                          )}
+                        </div>
+                      )}
 
                       {images.length > 0 && (
                         <div className="mt-2 flex flex-col gap-2">

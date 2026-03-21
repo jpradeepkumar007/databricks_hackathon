@@ -362,6 +362,8 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
             if (img?.data_base64) {
               const mime = img.mime ?? 'image/png';
               const data = img.data_base64;
+              // Log injection attempt
+              console.log('[Chat] Injecting image into UI stream', { mime, length: String(data).length });
               // Write as a text part containing an inline <img> tag.
               writer.write({ type: 'text', text: `<img src="data:${mime};base64,${data}"/>` });
             }

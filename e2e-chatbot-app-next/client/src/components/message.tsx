@@ -183,6 +183,18 @@ const PurePreviewMessage = ({
                 );
               }
               if (mode === 'view') {
+                const raw = joinMessagePartSegments(parts) ?? '';
+                // Extract inline <img src="..."> tags and render them as images
+                const imgRegex = /<img\s+[^>]*src=(?:"|')(.*?)(?:"|')[^>]*>/gi;
+                const images: string[] = [];
+                let textWithoutImgs = raw.replace(imgRegex, (_m, src) => {
+                  if (src) images.push(src);
+                  return '';
+                });
+
+                // Trim leftover whitespace/newlines caused by stripping
+                textWithoutImgs = textWithoutImgs.trim();
+
                 return (
                   <div key={key}>
                     <MessageContent
@@ -195,8 +207,22 @@ const PurePreviewMessage = ({
                       })}
                     >
                       <Response>
-                        {sanitizeText(joinMessagePartSegments(parts))}
+                        {sanitizeText(textWithoutImgs)}
                       </Response>
+
+                      {images.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-2">
+                          {images.map((src, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={`img-${key}-${i}`}
+                              src={src}
+                              alt={`image-${i}`}
+                              className="max-w-full rounded-md border bg-muted"
+                            />
+                          ))}
+                        </div>
+                      )}
                     </MessageContent>
                   </div>
                 );

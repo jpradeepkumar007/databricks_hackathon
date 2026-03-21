@@ -262,6 +262,8 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
     // Collect raw image chunks emitted by the provider so we can inject
     // them into the UI message stream as text parts with <img src="data:...">.
     const imageChunks: Array<{ mime?: string; data_base64?: string }> = [];
+    // UI writer reference to forward image parts immediately when available
+    let uiWriter: any | null = null;
 
     const result = streamText({
       model,
@@ -280,6 +282,19 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
               const item = raw.item;
               imageChunks.push({ mime: item.mime, data_base64: item.data_base64 });
               console.log('[Chat] Captured image chunk (base64 length):', String(item.data_base64 ?? '').length);
+
+              // If the UI writer is active, forward immediately so the client
+              // can render the image during streaming.
+              if (uiWriter) {
+                try {
+                  const mime = item.mime ?? 'image/png';
+                  const data = item.data_base64;
+                  console.log('[Chat] Forwarding captured image to UI writer immediately', { mime, length: String(data).length });
+                  uiWriter.write({ type: 'text', text: `<img src="data:${mime};base64,${data}"/>` });
+                } catch (fwErr) {
+                  console.warn('[Chat] Failed to forward captured image immediately', fwErr);
+                }
+              }
             }
           } catch (e) {
             // ignore
@@ -287,7 +302,7 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
           try {
             // Always log raw backend response without any filtering/transform
             if (typeof raw === 'string') {
-              console.log('[Chat][RAW CHUNK]', raw);
+              console.log('[Chat][RAW CHUNK]', raw.slice(0, 1000));
             } else {
               try {
                 console.log('[Chat][RAW CHUNK]', JSON.stringify(raw));
@@ -333,6 +348,9 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
       // rather than the AI SDK's default short-id format (e.g. "Xt8nZiQRj1fS4yiU").
       generateId: generateUUID,
       execute: async ({ writer }) => {
+        // Expose writer so onChunk can forward images immediately when they arrive
+        uiWriter = writer;
+        console.log('[Chat] UI writer attached for immediate forwarding');
         // Manually drain the AI stream so we can append the traceId data part
         // after all model chunks are processed (traceId is captured via onChunk).
         // result.toUIMessageStream() converts TextStreamPart → UIMessageChunk:
@@ -352,12 +370,16 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
           },
         });
 
+        console.log('[Chat] Starting drainStreamToWriter');
         const { failed } = await drainStreamToWriter(aiStream, writer);
+        console.log('[Chat] Finished drainStreamToWriter');
 
         // After draining the stream, inject any captured image chunks into
         // the UI stream as text parts containing <img src="data:..."> so the
-        // client can render them.
+        // client can render them. If images were forwarded earlier, this
+        // ensures any remaining captured images are sent.
         try {
+          console.log('[Chat] imageChunks length before injection', imageChunks.length);
           for (const img of imageChunks) {
             if (img?.data_base64) {
               const mime = img.mime ?? 'image/png';
@@ -371,6 +393,10 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
         } catch (e) {
           // Do not let image injection break streaming
           console.warn('[Chat] Failed to inject captured images into UI stream', e);
+        } finally {
+          // Detach the UI writer; no longer forwarding immediately
+          uiWriter = null;
+          console.log('[Chat] UI writer detached after injection');
         }
 
         if (failed) {

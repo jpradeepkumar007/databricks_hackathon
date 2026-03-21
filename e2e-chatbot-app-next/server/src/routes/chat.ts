@@ -1,30 +1,23 @@
 import {
-          try {
-            if (raw?.type === 'item' && raw?.item?.type === 'image') {
-              const item = raw.item;
-              console.log('[Chat] Captured image chunk (base64 length):', String(item.data_base64 ?? '').length);
+  Router,
+  type Request,
+  type Response,
+  type Router as RouterType,
+} from 'express';
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  streamText,
+  generateText,
+  type LanguageModelUsage,
+  pipeUIMessageStreamToResponse,
+} from 'ai';
+import type { LanguageModelV3Usage } from '@ai-sdk/provider';
 
-              // If the UI writer is active, forward immediately so the client
-              // can render the image during streaming. Only push to `imageChunks`
-              // when we were NOT able to forward immediately (or when the UI
-              // writer is not attached). This avoids writing the same image twice
-              // later when we inject remaining captured images.
-              if (uiWriter) {
-                try {
-                  const mime = item.mime ?? 'image/png';
-                  const data = item.data_base64;
-                  console.log('[Chat] Forwarding captured image to UI writer immediately', { mime, length: String(data).length });
-                  uiWriter.write({ type: 'file', mediaType: mime, url: `data:${mime};base64,${data}` });
-                } catch (fwErr) {
-                  console.warn('[Chat] Failed to forward captured image immediately', fwErr);
-                  // Save for later injection if immediate forward failed
-                  imageChunks.push({ mime: item.mime, data_base64: item.data_base64 });
-                }
-              } else {
-                // UI writer not attached yet — store for later injection
-                imageChunks.push({ mime: item.mime, data_base64: item.data_base64 });
-              }
-            }
+// Convert ai's LanguageModelUsage to @ai-sdk/provider's LanguageModelV3Usage
+function toV3Usage(usage: LanguageModelUsage): LanguageModelV3Usage {
+  return {
+    inputTokens: {
       total: usage.inputTokens,
       noCache: undefined,
       cacheRead: undefined,

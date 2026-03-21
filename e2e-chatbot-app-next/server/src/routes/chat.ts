@@ -259,6 +259,10 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
         : {}),
     };
 
+    // Collect raw image chunks emitted by the provider so we can inject
+    // them into the UI message stream as text parts with <img src="data:...">.
+    const imageChunks: Array<{ mime?: string; data_base64?: string }> = [];
+
     const result = streamText({
       model,
       messages: modelMessages,
@@ -270,6 +274,16 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
       onChunk: ({ chunk }) => {
         if (chunk.type === 'raw') {
           const raw = chunk.rawValue as any;
+          // Capture image item chunks emitted by the backend
+          try {
+            if (raw?.type === 'item' && raw?.item?.type === 'image') {
+              const item = raw.item;
+              imageChunks.push({ mime: item.mime, data_base64: item.data_base64 });
+              console.log('[Chat] Captured image chunk (base64 length):', String(item.data_base64 ?? '').length);
+            }
+          } catch (e) {
+            // ignore
+          }
           try {
             // Always log raw backend response without any filtering/transform
             if (typeof raw === 'string') {
@@ -339,6 +353,23 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
         });
 
         const { failed } = await drainStreamToWriter(aiStream, writer);
+
+        // After draining the stream, inject any captured image chunks into
+        // the UI stream as text parts containing <img src="data:..."> so the
+        // client can render them.
+        try {
+          for (const img of imageChunks) {
+            if (img?.data_base64) {
+              const mime = img.mime ?? 'image/png';
+              const data = img.data_base64;
+              // Write as a text part containing an inline <img> tag.
+              writer.write({ type: 'text', text: `<img src="data:${mime};base64,${data}"/>` });
+            }
+          }
+        } catch (e) {
+          // Do not let image injection break streaming
+          console.warn('[Chat] Failed to inject captured images into UI stream', e);
+        }
 
         if (failed) {
           console.log('Streaming failed, falling back to generateText...');

@@ -348,6 +348,40 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
         // Store in-memory for ephemeral mode (also useful when DB is available)
         storeMessageMeta(responseMessage.id, id, traceId);
 
+        // Log a concise, safe summary of the generated response for debugging.
+        try {
+          const summarizePart = (part: any) => {
+            if (!part || typeof part !== 'object') return { type: String(part) };
+            switch (part.type) {
+              case 'text':
+                return { type: 'text', text: String(part.text ?? '').slice(0, 1000) };
+              case 'file':
+                return {
+                  type: 'file',
+                  filename: part.filename ?? null,
+                  mediaType: part.mediaType ?? null,
+                  url: part.url ?? null,
+                };
+              default:
+                return { type: part.type ?? 'unknown', data: part.data ?? null };
+            }
+          };
+
+          const summary = {
+            id: responseMessage.id,
+            role: responseMessage.role,
+            parts: Array.isArray(responseMessage.parts)
+              ? responseMessage.parts.map(summarizePart)
+              : [],
+            metadata: responseMessage.metadata ?? null,
+            traceId,
+          };
+
+          console.log('[Chat] Generated response summary:', JSON.stringify(summary));
+        } catch (err) {
+          console.warn('[Chat] Failed to log generated response summary', err);
+        }
+
         try {
           await saveMessages({
             messages: [

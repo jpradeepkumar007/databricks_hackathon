@@ -240,7 +240,7 @@ const PurePreviewMessage = ({
 
                       {/* Render file/attachment parts after the text so images appear after output */}
                       {attachmentsFromMessage.length > 0 && (
-                        <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className="mt-2 flex flex-col gap-3">
                           {attachmentsFromMessage.map((attachment, i) =>
                             attachment.mediaType?.startsWith('image') ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -248,7 +248,8 @@ const PurePreviewMessage = ({
                                 key={`attach-img-${key}-${i}`}
                                 src={attachment.url}
                                 alt={attachment.filename ?? `attachment-${i}`}
-                                className="w-full rounded-md border bg-muted"
+                                className="w-full rounded-md border bg-muted max-h-[900px] object-contain"
+                                style={{ width: '100%' }}
                               />
                             ) : (
                               <PreviewAttachment
@@ -265,14 +266,15 @@ const PurePreviewMessage = ({
                       )}
 
                       {images.length > 0 && (
-                        <div className="mt-2 flex flex-col gap-2">
+                        <div className="mt-2 flex flex-col gap-3">
                           {images.map((src, i) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               key={`img-${key}-${i}`}
                               src={src}
                               alt={`image-${i}`}
-                              className="max-w-full rounded-md border bg-muted"
+                              className="w-full rounded-md border bg-muted max-h-[900px] object-contain"
+                              style={{ width: '100%' }}
                             />
                           ))}
                         </div>

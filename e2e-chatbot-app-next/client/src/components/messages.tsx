@@ -1,5 +1,5 @@
 import { PreviewMessage, AwaitingResponseMessage } from './message';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import equal from 'fast-deep-equal';
 import type { UseChatHelpers } from '@ai-sdk/react';
 import { useMessages } from '@/hooks/use-messages';
@@ -41,7 +41,25 @@ function PureMessages({
     status,
   });
 
-  useDataStream();
+  const { dataStream } = useDataStream();
+
+  // Extract inline images from streaming data parts (e.g. injected
+  // `<img src="data:...">` fragments written by the server UI writer).
+  const streamImages = useMemo(() => {
+    if (!dataStream || dataStream.length === 0) return [] as string[];
+    const imgRegex = /<img\s+[^>]*src=(?:"|')(.*?)(?:"|')[^>]*>/gi;
+    const imgs: string[] = [];
+    for (const part of dataStream) {
+      if (part.type === 'text' && typeof (part as any).text === 'string') {
+        const text = (part as any).text as string;
+        let m: RegExpExecArray | null;
+        while ((m = imgRegex.exec(text))) {
+          if (m[1]) imgs.push(m[1]);
+        }
+      }
+    }
+    return imgs;
+  }, [dataStream]);
 
   useEffect(() => {
     if (status === 'submitted') {
@@ -96,6 +114,25 @@ function PureMessages({
             ref={messagesEndRef}
             className="min-h-[24px] min-w-[24px] shrink-0"
           />
+
+          {/* Render any images emitted via the data stream while streaming */}
+          {streamImages.length > 0 &&
+            messages.length > 0 &&
+            messages[messages.length - 1].role === 'assistant' && (
+              <div className="mx-auto flex w-full max-w-4xl px-4 py-2">
+                <div className="flex flex-col gap-2 w-full">
+                  {streamImages.map((src, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={`stream-img-${i}`}
+                      src={src}
+                      alt={`stream-image-${i}`}
+                      className="max-w-full rounded-md border bg-muted"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
         </ConversationContent>
       </Conversation>
 

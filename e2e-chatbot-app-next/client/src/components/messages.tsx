@@ -50,6 +50,7 @@ function PureMessages({
     const imgRegex = /<img\s+[^>]*src=(?:"|')(.*?)(?:"|')[^>]*>/gi;
     const imgs: string[] = [];
     for (const part of dataStream) {
+      // Case 1: direct text data part (e.g., writer.write({type: 'text', text: '...'}))
       if (part.type === 'text' && typeof (part as any).text === 'string') {
         const text = (part as any).text as string;
         let m: RegExpExecArray | null;
@@ -57,7 +58,22 @@ function PureMessages({
           if (m[1]) imgs.push(m[1]);
         }
       }
+
+      // Case 2: some SDKs emit a 'message' data part containing a message object
+      // with parts array. Inspect those parts for inline text parts with <img>.
+      if (part.type === 'message' && (part as any).message?.parts) {
+        const msgParts = (part as any).message.parts as Array<any>;
+        for (const p of msgParts) {
+          if (p?.type === 'text' && typeof p.text === 'string') {
+            let m: RegExpExecArray | null;
+            while ((m = imgRegex.exec(p.text))) {
+              if (m[1]) imgs.push(m[1]);
+            }
+          }
+        }
+      }
     }
+    if (imgs.length > 0) console.debug('[Messages] streamImages found', imgs.length, imgs.slice(0,5));
     return imgs;
   }, [dataStream]);
 

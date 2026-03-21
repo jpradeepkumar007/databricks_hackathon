@@ -63,6 +63,10 @@ const PurePreviewMessage = ({
   requiresScrollPadding: boolean;
   initialFeedback?: Feedback;
 }) => {
+  // Small inline SVG demo image used to verify image rendering in the UI.
+  const demoSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='150'><rect width='100%' height='100%' fill='%23f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='20'>DEMO IMAGE</text></svg>`;
+  const demoSrc = `data:image/svg+xml;utf8,${encodeURIComponent(demoSvg)}`;
+
   const [mode, setMode] = useState<'view' | 'edit'>('view');
   const [showErrors, setShowErrors] = useState(false);
 
@@ -234,6 +238,16 @@ const PurePreviewMessage = ({
                           message.role === 'assistant',
                       })}
                     >
+                      {/* Demo image to validate UI image rendering */}
+                      {message.role === 'assistant' && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={demoSrc}
+                          alt="demo-image"
+                          className="mb-2 max-w-full rounded-md border bg-muted"
+                        />
+                      )}
+
                       <Response>
                         {sanitizeText(textWithoutImgs)}
                       </Response>

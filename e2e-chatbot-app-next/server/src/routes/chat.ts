@@ -290,7 +290,10 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
                   const mime = item.mime ?? 'image/png';
                   const data = item.data_base64;
                   console.log('[Chat] Forwarding captured image to UI writer immediately', { mime, length: String(data).length });
-                  uiWriter.write({ type: 'text', text: `<img src="data:${mime};base64,${data}"/>` });
+                  // Emit as a file part so the client receives a proper file/image
+                  // chunk (mediaType + data URL) which maps to message.parts of
+                  // type 'file' and renders via PreviewAttachment.
+                  uiWriter.write({ type: 'file', mediaType: mime, url: `data:${mime};base64,${data}` });
                 } catch (fwErr) {
                   console.warn('[Chat] Failed to forward captured image immediately', fwErr);
                 }
@@ -386,8 +389,8 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
               const data = img.data_base64;
               // Log injection attempt
               console.log('[Chat] Injecting image into UI stream', { mime, length: String(data).length });
-              // Write as a text part containing an inline <img> tag.
-              writer.write({ type: 'text', text: `<img src="data:${mime};base64,${data}"/>` });
+              // Emit as a file part so the client will render it as an attachment/image.
+              writer.write({ type: 'file', mediaType: mime, url: `data:${mime};base64,${data}` });
             }
           }
         } catch (e) {

@@ -20,6 +20,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useChatVisibility } from '@/hooks/use-chat-visibility';
 import { ChatSDKError } from '@chat-template/core/errors';
 import { useDataStream } from './data-stream-provider';
+import { debugLog } from '@/lib/debug';
 import { isCredentialErrorMessage } from '@/lib/oauth-error-utils';
 import { ChatTransport } from '../lib/ChatTransport';
 import type { ClientSession } from '@chat-template/auth';
@@ -173,6 +174,20 @@ export function Chat({
       setDataStream((ds) =>
         ds ? [...ds, dataPart as DataUIPart<CustomUIDataTypes>] : [],
       );
+      try {
+        // Debug: log raw data parts received from the backend stream
+        // This includes `data-title`, `data-usage`, and any `message` parts
+        // that may carry `message.parts` with image data.
+        debugLog('[Chat onData] raw dataPart:', dataPart);
+        // If the data part embeds a message, log its parts for easier tracing
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const maybeMsg = (dataPart as any).message;
+        if (maybeMsg?.parts) {
+          debugLog('[Chat onData] embedded message id:', maybeMsg.id, 'parts:', maybeMsg.parts);
+        }
+      } catch (err) {
+        // ignore logging errors
+      }
       if (dataPart.type === 'data-usage') {
         setUsage(dataPart.data as LanguageModelUsage);
       }

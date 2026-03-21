@@ -1,4 +1,5 @@
 import React, { memo, useState } from 'react';
+import { debugLog } from '@/lib/debug';
 import { AnimatedAssistantIcon } from './animation-assistant-icon';
 import { Response } from './elements/response';
 import { MessageContent } from './elements/message';
@@ -70,6 +71,33 @@ const PurePreviewMessage = ({
     addToolApprovalResponse,
     sendMessage,
   });
+
+  React.useEffect(() => {
+    try {
+      // Log message render for debugging streaming/image issues
+      // Keep the log compact to avoid overwhelming the console
+      const partsPreview = message.parts.map((p: any) => {
+        const base: any = { type: p.type };
+        if (p.type === 'text') {
+          // include a short preview of text
+          base.preview = p.text?.slice(0, 200);
+        }
+        if (p.type === 'file' || p.type === 'attachment') {
+          base.filename = p.filename ?? p.url ?? undefined;
+          base.mediaType = p.mediaType ?? p.contentType ?? undefined;
+        }
+        return base;
+      });
+      debugLog('[PreviewMessage] render', {
+        id: message.id,
+        role: message.role,
+        partsCount: message.parts.length,
+        parts: partsPreview,
+      });
+    } catch (err) {
+      // ignore logging errors
+    }
+  }, [message.id, message.role, message.parts]);
 
   const attachmentsFromMessage = message.parts.filter(
     (part) => part.type === 'file',

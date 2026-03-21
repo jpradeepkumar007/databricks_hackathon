@@ -4,6 +4,7 @@ import {
   type UIMessage,
   type UIMessageChunk,
 } from 'ai';
+import { debugLog } from './debug';
 
 /**
  * Extends the DefaultChatTransport to allow for a callback to be called when a stream part is received.
@@ -31,6 +32,11 @@ export class ChatTransport<
     return processedStream.pipeThrough(
       new TransformStream<UIMessageChunk, UIMessageChunk>({
         transform(chunk, controller) {
+          try {
+            debugLog('[ChatTransport] stream chunk:', chunk);
+          } catch (err) {
+            // ignore logging errors
+          }
           onStreamPart?.(chunk);
           controller.enqueue(chunk);
         },

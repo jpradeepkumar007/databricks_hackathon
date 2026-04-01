@@ -66,6 +66,8 @@ import { drainStreamToWriter, fallbackToGenerateText } from '../lib/stream-fallb
 export const chatRouter: RouterType = Router();
 
 const streamCache = new StreamCache();
+const SEND_ONLY_LATEST_USER_MESSAGE =
+  process.env.CHAT_SEND_ONLY_LATEST_MESSAGE === 'true';
 // Apply auth middleware to all chat routes
 chatRouter.use(authMiddleware);
 
@@ -249,7 +251,11 @@ chatRouter.post('/', requireAuth, async (req: Request, res: Response) => {
     const streamId = generateUUID();
 
     const model = await myProvider.languageModel(selectedChatModel);
-    const modelMessages = await convertToModelMessages(uiMessages);
+    const messagesForProvider = selectMessagesForProvider({
+      uiMessages,
+      latestUserMessage: message,
+    });
+    const modelMessages = await convertToModelMessages(messagesForProvider);
     const requestHeaders = {
       [CONTEXT_HEADER_CONVERSATION_ID]: id,
       [CONTEXT_HEADER_USER_ID]: session.user.email ?? session.user.id,
@@ -730,5 +736,30 @@ function truncatePreserveWords(input: string, maxLength: number): string {
   }
 
   return slice.slice(0, lastSpaceIndex);
+}
+
+function selectMessagesForProvider({
+  uiMessages,
+  latestUserMessage,
+}: {
+  uiMessages: ChatMessage[];
+  latestUserMessage?: ChatMessage;
+}): ChatMessage[] {
+  if (!SEND_ONLY_LATEST_USER_MESSAGE || !latestUserMessage) {
+    return uiMessages;
+  }
+
+  if (latestUserMessage.role !== 'user') {
+    return uiMessages;
+  }
+
+  const systemMessages = uiMessages.filter((msg) => msg.role === 'system');
+  const singleTurnMessages = [...systemMessages, latestUserMessage];
+
+  console.log(
+    '[Chat] CHAT_SEND_ONLY_LATEST_MESSAGE is enabled - forwarding single-turn user prompt to provider',
+  );
+
+  return singleTurnMessages;
 }
 

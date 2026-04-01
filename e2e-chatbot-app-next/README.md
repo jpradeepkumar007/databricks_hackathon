@@ -192,6 +192,10 @@ By default, conversation messages are stored in memory and lost when the server 
 
 See [Database Modes](#database-modes) for setup instructions.
 
+### Single-Turn Request Mode
+
+Some deployments prefer not to send the entire conversation history to Databricks for every turn. Set `CHAT_SEND_ONLY_LATEST_MESSAGE=true` in your `.env` file to enable a single-turn mode that forwards only the most recent user prompt (plus any system instructions) to the serving endpoint while still persisting the full history locally. Leave the flag unset (default) to preserve the standard multi-turn behavior.
+
 ---
 
 ## Database Modes
